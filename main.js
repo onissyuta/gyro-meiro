@@ -1,9 +1,36 @@
 import * as PIXI from 'pixi.js';
+import { gsap } from 'gsap';
 import { MazeCreatorExtend } from './MazeCreatorExtend.js'
 
-const app = new PIXI.Application({ width: 820, height: 820, backgroundColor: 0xffffff });
-document.body.appendChild(app.view);
 
+
+
+
+let x = 0
+let y = 0;
+function handleOrientation(event) {
+    x = event.beta; // In degree in the range [-180,180)
+    y = event.gamma; // In degree in the range [-90,90)
+  
+    // Because we don't want to have the device upside down
+    // We constrain the x value to the range [-90,90]
+    if (x > 90) {
+      x = 90;
+    }
+    if (x < -90) {
+      x = -90;
+    }
+  
+    output.textContent = `beta: ${x}\n`;
+    output.textContent += `gamma: ${y}\n`;
+  }
+  
+window.addEventListener("deviceorientation", handleOrientation);
+
+
+
+const app = new PIXI.Application({ width: 400, height: 400, backgroundColor: 0xffffff });
+document.body.appendChild(app.view);
 
 
 const createWall = (x, y) => {
@@ -11,10 +38,11 @@ const createWall = (x, y) => {
     const wallHeight = app.view.height / row;
 
     const wall = new PIXI.Graphics();
-    wall.lineStyle(0);
-    wall.beginFill(0x000000);
+    wall.lineStyle(0, 0x00ff00);
+    wall.beginFill(0xffffff);
     wall.drawRect(0, 0, wallWidth, wallHeight);
     wall.endFill();
+    wall.tint = 0x0000ff;
 
     wall.eventMode = 'static';
     wall.position.set(wallWidth * x, wallHeight * y);
@@ -74,25 +102,13 @@ const createWall = (x, y) => {
 
 
 
-let column = 41;
-let row = 41;
+let column = 21;
+let row = 21;
 
 // const maze = new MazeCreator(column, row);
 
 const mazeCreator = new MazeCreatorExtend(column, row);
 const maze = mazeCreator.createMaze();
-
-/*
-const maze = [
-    [1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1],
-    [1,0,1,0,1,1,1],
-    [1,0,1,0,0,0,1],
-    [1,0,1,1,1,0,1],
-    [1,0,1,0,0,0,1],
-    [1,1,1,1,1,1,1],
-];
-*/
 
 const wallContainer = new PIXI.Container();
 maze.forEach((elm, y) => {
@@ -104,19 +120,16 @@ maze.forEach((elm, y) => {
 });
 app.stage.addChild(wallContainer);
 
+
 const player = new PIXI.Graphics();
 player.beginFill(0xff0000);
-player.drawCircle(0, 0, 6);
+// player.drawCircle(0, 0, 6);
+player.drawRect(0, 0, 10, 10);
 player.endFill();
-player.position.set(32, 32);
+player.position.set((app.view.width / column) * 1 + 2, (app.view.height / row) * 1 + 2);
 player.eventMode = 'static';
 app.stage.addChild(player);
 
-
-console.log(player.x);
-console.log(player.position.y);
-console.log(player.width);
-console.log(player.height);
 
 
 // 現在の移動方向
@@ -170,6 +183,7 @@ goalText.y = app.view.height - 45;
 app.stage.addChild(goalText);
 
 
+
 app.ticker.add(() => {
     const newBounds = {
         // x: player.x - (player.width / 2),
@@ -180,8 +194,8 @@ app.ticker.add(() => {
         height: player.height
     };
 
-
-    const delta = 2;
+    
+    const delta = 1;
     switch (currentMove) {
         case 'walkLeft': newBounds.x -= delta; break;
         case 'walkRight': newBounds.x += delta; break;
@@ -189,31 +203,61 @@ app.ticker.add(() => {
         case 'walkDown': newBounds.y += delta; break;
         default: break;
     }
-    // console.log(newBounds);
 
-    let hitTest = false;
 
-    wallContainer.children.forEach(wall => {
-        const hitTest = testAABB(newBounds, { x: wall.x, y: wall.y, width: wall.width, height: wall.height });
+    if(x !== null && y !== null){
+        newBounds.x += y * 0.1;
+        newBounds.y += x * 0.1;
+        console.log(x, y);
+        console.log(newBounds);
+    }
 
-        if (hitTest) {
-            wall.x += 10;
-            // player.x = newBounds.x;
-            // player.y = newBounds.y;
+    
+    let hitTest;
+    let number;
+    let direction;
+    for(let i = 0; i < wallContainer.children.length; i++) {
+        const wallBounds = {
+            x: wallContainer.children[i].x,
+            y: wallContainer.children[i].y,
+            width: wallContainer.children[i].width,
+            height: wallContainer.children[i].height
+        };
+
+        hitTest = testAABB(newBounds, wallBounds);
+
+        if(hitTest){
+            number = i;
+            
+            if(newBounds.x + newBounds.width > wallBounds.x){
+                direction = 'right';
+            } else if(newBounds.x + newBounds.width < wallBounds.x) {
+                direction = 'left';
+            } else if(newBounds.y + newBounds.height > wallBounds.y) {
+                direction = 'bottom';
+            } else if(newBounds.y + newBounds.height < wallBounds.y) {
+                direction = 'top';
+            }
+            break;
         }
+    }
 
+    if(!hitTest){
         player.x = newBounds.x;
         player.y = newBounds.y;
-    });
+    } else {
+        wallContainer.children[number].tint = 0x00ff00;
+        
 
+    }
 
-
-
-    // const hitTest = testAABB(newBounds, { x: 200, y: 200, width: 160, height: 160 });
-    // if (!hitTest) {
-
-    // }
-
-    // console.log(currentMove)
+    output2.textContent = `direction: ${direction}\n`;
 
 });
+
+
+const output = document.querySelector(".output");
+const output2 = document.querySelector(".output2");
+
+
+
